@@ -60,3 +60,5 @@ flexbar --threads 10 \
  The first two are the cleaned read1 and read2 fastq files that will be used in subsequent applications (PathoScope). The `flexcleaned.log` will be used in Part 5 where you count the number of raw and cleaned reads. This will tell you how strigent your filtering was. Ideally you want to retain as much of your reads as possible, so if you see in Part 5 or in the `flexcleaned.log` that you only retained, say, about 75% of your reads, maybe you should try less strict filtering options. Unless, of course, you started with very dirty (unreliable, low quality, high adapter contamination,etc) data, then maybe 75% read retainment is alright.
 
  Understand your starting quality to see if the amount of reads you removed is reasonable.
+ 
+ Next step: run [fastQC](fastqc.md) on your cleaned samples
