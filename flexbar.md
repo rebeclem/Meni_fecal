@@ -11,10 +11,7 @@ You will need to put the adapter sequences that you used when library prepping y
 
 <br />
 
-You need to be within the Analysis folder before submitting `flexbar.sh`. 
-```
-cd Analysis
-```
+Make sure your `samp.txt` is in the folder that contains Analysis, refs, and scripts before submitting `flexbar.sh`. 
 
 Submit a job to Slurm to call Flexbar on the raw sequence files.
 ```
