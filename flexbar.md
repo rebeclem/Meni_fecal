@@ -7,7 +7,7 @@ Before we can use PathoScope to map our reads to genomes, we first need to "clea
 
 You will need to put the adapter sequences that you used when library prepping your samples into a fasta file. Save adapter sequences for paired-end as `refs/adapters_PE.fa.`
 
-#### You can get an adapters file from trimmomatic for Nextera XT by navigating to where trimmomatic is located (`module show trimmomatic`) and then finding the file called (NexteraPE-PE.fa).
+* You can get an adapters file from trimmomatic for Nextera XT by navigating to where trimmomatic is located `module show trimmomatic` and then finding the file called [NexteraPE-PE.fa](NexteraPE-PE.fa).
 
 <br />
 
