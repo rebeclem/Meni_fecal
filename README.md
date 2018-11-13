@@ -45,3 +45,5 @@ for f in /lustre/groups/cbi/shared/Databases/NCBI_rep_genomes/latest/*.bt2; do
     ln -s $f
 done
 
+***
+Next Step: [Perform FastQC](fastqc.md)
