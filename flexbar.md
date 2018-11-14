@@ -61,4 +61,48 @@ flexbar --threads 10 \
 
  Understand your starting quality to see if the amount of reads you removed is reasonable.
  
- Next step: run [fastQC](fastqc.md) on your cleaned samples
+ Next step: run [fastQC](fastqc.md) using [this script](fastqcflexbar.sh) on your cleaned samples inside the `Analysis` folder
+
+
+
+You will get two output files for each fastq files (total of 4 files):
+1.  `flexcleaned_1_fastqc.html`
+2.  `flexcleaned_1_fastqc.zip`
+3.  `flexcleaned_2_fastqc.html`
+4.  `flexcleaned_2_fastqc.zip`
+
+<br />
+
+Again, the `html` files are the ones that we are interested in. We're going to move all the `html` files into a directory so we can look at all the files at the same time.
+```
+# remember we're still in the Analysis folder
+mkdir -p fastqc_cleaned
+mv */flexcleaned*.html fastqc_cleaned/
+```
+Now download that folder to your computer with this command. This command needs to be excuted on your local computer (not within colonial one). I recommend opening up another tab on your terminal and then executing this command:
+```
+scp your_username@login.colonialone.edu:path/to/Analysis/fastqc_cleaned /local/dir
+```
+>You will need to replace a few things, same thing as above. As an example for you, I have used my path and username.
+>
+>| your_username | path/to/Analysis | local/dir |
+>| --- | --- | --- |
+>| kmgibson | /lustre/EV_konzo/Analysis | ~/Documents/EVKonzo |
+>
+
+<br />
+<br />
+
+All of the files can be opened up through Safari/Chrome/etc. (whatever internet browser you use). If you open the downloaded folder in your Finder (if on mac), you can select a file (so it is highlighted) and press the *space* button. A temporary window should show up with your results. Now you can press the *down arrow* and scroll through all the files relatively quickly.
+
+See this [PDF](https://github.com/kmgibson/EV_konzo/blob/master/FastQC_Manual.pdf) explaining the FastQC results or this [website by the creators of FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) that also has explaination of the results. 
+- The PDF was downloaded from the [University of Missouri sequencing core](https://dnacore.missouri.edu).
+
+<br />
+
+Finally, we need to remove unncessary files:
+```
+rm Konzo*/flexcleaned*fastqc.zip
+```
+
+<br />
