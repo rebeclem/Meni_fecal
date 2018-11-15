@@ -7,5 +7,5 @@ Based off Keylie's Konzo pipeline
 
 3) Use [flexbar](flexbar.md) to trim your reads
 
-4) [Count your cleaned and raw reads](readcount.md)
+4) [Count your cleaned and raw reads](countreads.md)
 
