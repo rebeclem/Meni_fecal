@@ -1,11 +1,12 @@
 # Count number of raw and cleaned reads
 
 For this part you will need this [python script](pulling_readcount.py)
+Make sure to move all fastqc and other files out of your Analysis directory before doing this.
 
 ### *__Pulling number of raw reads and cleaned reads__*
 ```
 cd Analysis &&
-for f in Konzo*; do
+for f in *; do
     cd $f &&
     python ../../scripts/pulling_readcount.py &&
     cd .. &&
@@ -13,7 +14,7 @@ for f in Konzo*; do
 done
 
 echo -e "Samp\tRaw\tCleaned" >> read_count.txt
-for f in Konzo*; do
+for f in *; do
     reads=$(cat $f/flexbar_reads.txt) &&
     echo -e "${f}\t${reads}" >> read_count.txt &&
     echo $f
@@ -27,5 +28,5 @@ Format needs to be as such:<br />
 
 | Samp     | Reads   | Status | Group |
 | -------------- | ----------- | ------ | ------- |
-| Konzo01 | 5652615    | raw    | Kinshasa Control|
-| Konzo90	| 7062682	| cleaned	| Kahemba Cases |
+| 3S | 5652615    | raw    | Kinshasa Control|
+| 3V1	| 7062682	| cleaned	| Kahemba Cases |
