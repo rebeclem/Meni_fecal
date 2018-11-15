@@ -15,7 +15,7 @@ Make sure your `samp.txt` is in the folder that contains Analysis, refs, and scr
 
 Submit a job to Slurm to call Flexbar on the raw sequence files.
 ```
-sbatch ../scripts/flexbar.sh
+sbatch flexbar.sh
 ```
 
 <br />
