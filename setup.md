@@ -2,18 +2,21 @@
 ## Do this in the fastq generation directory
 
 ### Creating a directory for each sample.
+For every file inside a folder that has a L001 and an R1, make an object samp that is the folder name. Print the folder name and then make a directory that is called the sample name with a designated prefix.
+* The ${f%%_*}; is essentially calling the file name and taking out the longest possible thing that includes _* in it
 ```
    for f in */*L001*R1*.gz;
    do samp=${f%%_*};
    echo ${samp};
-   mkdir -p $samp;
+   mkdir -p "meni_"$samp;
 done
 ```
 ### Moving all sequence files into sample directory.
+Move all the files into the folders that match their directory.
 ```
 for f in */*.gz;
    do samp=${f%%_*};
-   mv $f $samp;
+   mv $f "meni_"$samp;
 done
 ```
 
