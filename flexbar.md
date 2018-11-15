@@ -77,17 +77,21 @@ Again, the `html` files are the ones that we are interested in. We're going to m
 ```
 # remember we're still in the Analysis folder
 mkdir -p fastqc_cleaned
-mv */flexcleaned*.html fastqc_cleaned/
+# For each .html file, copy over a file with the folder name and flexcleaned_1 or flesxcleaned_2
+for f in *; do
+   mv $f/flexcleaned_1*.html fastqc_cleaned/${f}_flexcleaned_1.html
+   mv $f/flexcleaned_2*.html fastqc_cleaned/${f}_flexcleaned_2.html
+done
 ```
 Now download that folder to your computer with this command. This command needs to be excuted on your local computer (not within colonial one). I recommend opening up another tab on your terminal and then executing this command:
 ```
-scp your_username@login.colonialone.edu:path/to/Analysis/fastqc_cleaned /local/dir
+scp your_username@login.colonialone.gwu.edu:path/to/Analysis/fastqc_cleaned /local/dir
 ```
 >You will need to replace a few things, same thing as above. As an example for you, I have used my path and username.
 >
 >| your_username | path/to/Analysis | local/dir |
 >| --- | --- | --- |
->| kmgibson | /lustre/EV_konzo/Analysis | ~/Documents/EVKonzo |
+>| rebeccaclement | /lustre/Meni/Analysis | ~/Documents/Meni/fastqc_flexbar/ |
 >
 
 <br />
@@ -102,7 +106,8 @@ See this [PDF](https://github.com/kmgibson/EV_konzo/blob/master/FastQC_Manual.pd
 
 Finally, we need to remove unncessary files:
 ```
-rm Konzo*/flexcleaned*fastqc.zip
+rm */flexcleaned*fastqc.zip
 ```
 
 <br />
+Next Step: [Count number of raw and cleaned reads](countreads.md)
