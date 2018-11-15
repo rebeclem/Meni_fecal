@@ -1,9 +1,11 @@
 # Meni_fecal Pipeline
 Based off Keylie's Konzo pipeline
 
-1) you need to [set up your files](setup.md)
+1) [Set up your files](setup.md)
 
-2) you need to [run fastQC](fastqc.md) to quality check your samples
+2) [Run fastQC](fastqc.md) to quality check your samples
 
-3) use [flexbar](flexbar.md) to trim your reads
+3) Use [flexbar](flexbar.md) to trim your reads
+
+4) [Count your cleaned and raw reads](readcount.md)
 
