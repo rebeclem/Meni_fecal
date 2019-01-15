@@ -1,5 +1,5 @@
 # Meni_fecal Pipeline
-Based off Keylie's Konzo pipeline
+Based off [Keylie's Konzo pipeline](https://github.com/kmgibson/EV_konzo)
 
 1) [Set up your files](setup.md)
 
