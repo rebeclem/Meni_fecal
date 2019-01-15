@@ -8,13 +8,13 @@ cd Analysis
 ```
 These pathoscope files have been changed from Keylie's in the following ways: Removed the PhiX174, and got rid of the 1-91 array line.
 ### **_Mapping to Human_**
-You will need the [`pathoscope_human.sh`]() file.
+You will need the [`pathoscope_human.sh`](pathoscope_human.sh) file.
 ```
 sbatch -a 1-$(wc -l < ../samps.txt) ../scripts/pathoscope_human.sh
 ```
 
 ### **_Mapping to Bacteria_**
-You will need the [`pathoscope_bacteria.sh`]() file.
+You will need the [`pathoscope_bacteria.sh`](pathoscope_bacteria.sh) file.
 ```
 sbatch -a 1-$(wc -l < ../samps.txt) ../scripts/pathoscope_bacteria.sh
 ```
