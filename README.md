@@ -9,3 +9,4 @@ Based off [Keylie's Konzo pipeline](https://github.com/kmgibson/EV_konzo)
 
 4) [Count your cleaned and raw reads](countreads.md)
 
+5) [Run pathoscope](pathoscope.md)
