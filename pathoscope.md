@@ -36,16 +36,12 @@ In both of these files you will see the same format:
 Once finished, you need to do one more thing. 
 Run the following command on your local computer. This command downloads the `tsv` files from each sample. The `tsv` files are the output from PathoID that we will take into R to visualize.
 
-This command needs to be excuted on your local computer (not within colonial one). I recommend opening up another tab on your terminal and then executing this command:
+Outside of your analysis folder, make directories called `bac` and `human`
 ```
-mkdir -p pathoscope_output
-while read k; do
-    scp your_username@login.colonialone.edu:path/to/Analysis/${k}/pathoid-sam-report.tsv local/dir/pathoscope_output/${k}_pathoid-sam-report.tsv
-done <samps.txt
+mkdir bac
+mkdir human
+cat ../samps.txt | while read f; do cp $f/human/pathoid-sam-report.tsv path/to/human/${f}_pathoid-sam-report.tsv ; echo $f; done
 ```
 >Remember, you will need to replace a few things. As an example for you, I have used my path and username.
 >
->| your_username | path/to/Analysis | local/dir |
->| --- | --- | --- |
->| kmgibson | /lustre/EV_konzo/Analysis | ~/Documents/EVKonzo |
->
+
