@@ -19,6 +19,8 @@ module load samtools
 #### Counting the number of __HUMAN__ mapped reads.
 
 1st, convert the `sam` file to a `bam` file.
+For these commands, you may have to `ctrl c` to make it quit because it has `&`s at the end
+
 ```
 for d in *; do 
     samtools view -b $d/human/outalign.sam > $d/human/outalign.bam && echo "Converted $d/outalign.sam" &
