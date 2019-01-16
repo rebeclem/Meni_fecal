@@ -7,6 +7,8 @@ Based off [Keylie's Konzo pipeline](https://github.com/kmgibson/EV_konzo)
 
 3) Use [flexbar](flexbar.md) to trim your reads
 
+4) Run fastQC again
+
 4) [Count your cleaned and raw reads](countreads.md)
 
 5) [Run pathoscope](pathoscope.md)
