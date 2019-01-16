@@ -1,0 +1,1070 @@
+---
+title: "Eric Vilain Konzo Project 0601018 via CBI"
+output: html_notebook
+---
+
+# Sequencing and Taxonomic Visualizations
+## Setup
+```{r load libraries}
+library("ggplot2")     
+library("rentrez")
+library("XML")
+library("ggrepel")
+library("phyloseq")
+library("plyr")
+library("vegan")
+library("DESeq2")
+library("reshape2")
+library("colorspace")
+library("zoo")
+library("magrittr")
+library("tidyr")
+#Load directory/sample names
+setwd("~/Desktop/GitHub_Projects/EV_konzo")
+con1 <- file("./samps.txt", "r", blocking = FALSE) #open file connection for reading
+dir.names = readLines(con = con1) #each line is a directory name
+close(con1) #close file connection
+rm(con1)
+```
+
+
+
+## Sequencing Results Visual
+```{r sequencing results visual}
+# If you get the error: "cannot open file './EVKonzo_readcount.csv': No such file or directory Error in file(file, "rt") : cannot open the connection", then just copy and paste the first command into the console instead of running the whole block.
+seq.results <- read.csv("./EVKonzo_readcount.csv")
+seq.results$Status <- factor(seq.results$Status, levels=c("raw", "cleaned")) #this makes raw first
+seq.results_plot <- ggplot(data=seq.results, aes(x=Samp, y=Reads, fill=Status)) + geom_bar(stat="identity", position="dodge")
+seq.results_plot <- seq.results_plot + theme_classic() + theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+seq.results_plot
+ggsave("seq.results_plot.pdf", seq.results_plot)
+#Getting the average amount of reads:
+seq.results.df <- data.frame(seq.results)
+seq.median <- by(seq.results.df$Reads, seq.results.df$Status, median)
+seq.median
+seq.means <- by(seq.results.df$Reads, seq.results.df$Status, mean)
+seq.means
+```
+
+
+
+## Pathoscope Read Mapping Visual
+```{r Pathoscope Read Mapping visual}
+PS_map.results <- read.csv("PS_read_counts.csv")
+PS_map.results.long <- melt(cbind(PS_map.results, Samp = rownames(PS_map.results)), Group = PS_map.results$Group, id.vars = c('Samp','Group'))
+# Making Facet certain order
+PS_map.results.long$Group_f = factor(PS_map.results.long$Group, levels=c('Kinshasa Control','Kahemba Cases','Kahemba Control','Control'))
+PS_map.results_plot <- ggplot(PS_map.results.long, aes(x=Samp, y = value, fill = variable)) + geom_bar(position = "fill", stat = "identity", width = 0.75) +
+  theme_classic() + theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0)) +
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  ylab("Percentage")
+PS_map.results_plot
+ggsave("PS_map.results_plot.pdf", PS_map.results_plot)
+```
+
+
+
+## Loading Sample data
+```{r loading sample data}
+sampledata = read.csv("EVKonzo_metadata.csv")
+sampledata <- as.data.frame(sampledata)
+colnames(sampledata) <- c("Samp","Group")
+rownames(sampledata) <- sampledata[,1]
+sampledata$Group_f = factor(sampledata$Group, levels=c('Kinshasa Control','Kahemba Cases','Kahemba Control','Control'))
+#Kinshasa Control, Kahemba Cases, etc are the column names in the metadata.txt file. I am just restating them here so it knows the column names and in the order I want.
+```
+
+
+## Loading in Pathoscope data
+```{r pathoscope analysis}
+file.names = list.files(path = "./pathoscope_output", pattern="*.tsv", full.names = TRUE)
+columnsofinterests <- c('Genome','Final.Best.Hit.Read.Numbers') #Modify Final.Guess here to whatever column you'd like. The selected column is used to build the OTU table.
+for (i in 1:length(file.names)) assign(file.names[i], read.table(file.names[i], sep="\t", header=TRUE, skip=1)) #does this line do anything at all in this code? works with get, but we don't seem to use it
+alltables <- lapply(file.names, function(fn){
+  fn.next <- substr(fn,21,nchar(fn)-23)
+temp.df <- read.table(fn, sep="\t", header=TRUE, skip=1) %>%
+  tidyr::separate(Genome, sep='\\|', into=c('x', 'tid'), extra='drop') %>% 
+  dplyr::select(c('tid', 'Final.Best.Hit.Read.Numbers')) %>%
+  dplyr::group_by(tid) %>% 
+  dplyr::summarise(tot=sum(Final.Best.Hit.Read.Numbers)) %>% data.frame
+names(temp.df) <- c('ti', fn.next)
+return(temp.df)
+})
+#select just the column
+names(alltables) <- substr(file.names,1,nchar(file.names)-4)
+#merge all tables together
+all_merge <- Reduce(function(x,y) merge(x,y, by='ti', all=TRUE), alltables)
+ranks <-c('superkingdom', 'kingdom', 'phylum', 'class', 'order', 'suborder', 'family', 'subfamily', 'genus', 'subgenus', 'species', 'no rank') #These will be the ranks of our taxonomy table.
+patho.otu_mat <- data.matrix(all_merge[2:dim(all_merge)[2]])
+rownames(patho.otu_mat) <- all_merge$ti
+patho.otu_mat <- replace(patho.otu_mat, is.na(patho.otu_mat), 0) #replace NAs with 0
+patho.tax_mat <- matrix(data = NA, nrow=dim(patho.otu_mat)[1], ncol=length(ranks))
+rownames(patho.tax_mat) <- rownames(patho.otu_mat)
+colnames(patho.tax_mat) <- ranks
+```
+
+## Fetching Taxonomic Names from TaxonID
+```{r NCBI taxonomy fetch}
+UID2tax_mat <- function (taxmat, start_list = 1) { #function takes a matrix as input. matrix needs Taxon_IDs as rownames & taxonomic ranks as column names.
+  #set start_list to 1 normally, set it to something else if interrupted and need to start in the middle
+  num.UID.lists <- ceiling(length(rownames(taxmat))/100) #query NCBI 500 UIDs at a time
+  for(list.num in start_list:num.UID.lists){
+    start.num <- (list.num-1)*100+1
+    if (list.num == num.UID.lists) {
+      end.num <- length(rownames(taxmat))
+    } else {
+      end.num <- list.num*100
+    }
+    UID.string <- paste(rownames(taxmat)[start.num:end.num],collapse = ',')
+    upload <- entrez_post(db="taxonomy", id=UID.string)
+    fetch <- entrez_fetch(db="taxonomy", web_history=upload, rettype="xml", parsed=TRUE)
+    fetch.df <- XML::xmlToList(fetch)
+    for (row.num.i in start.num:end.num) {
+      counter <- row.num.i- (list.num-1)*100
+      if (is.null(fetch.df[counter]$Taxon$TaxId)) {
+        next #skip line if null
+      }
+      if (length(fetch.df[counter]$Taxon$LineageEx) > 0) {
+        for(it in 1:length(fetch.df[counter]$Taxon$LineageEx)) {
+          if ((fetch.df[counter]$Taxon$LineageEx[it]$Taxon$Rank %in% ranks)) {
+            taxmat[which(row.names(taxmat) == fetch.df[counter]$Taxon$TaxId),fetch.df[counter]$Taxon$LineageEx[it]$Taxon$Rank] <- fetch.df[counter]$Taxon$LineageEx[it]$Taxon$ScientificName
+          }
+        }
+      }
+    }
+    print(paste("List ", list.num, "/ ", num.UID.lists," retrieved."))
+    Sys.sleep(30)
+  }
+  return(taxmat)
+}
+patho.tax_mat.filled <- UID2tax_mat(patho.tax_mat) #uncomment this to load
+patho.tax <- tax_table(patho.tax_mat.filled[,c('superkingdom','phylum','class','order','family','genus','species')]) #not all of the columns (ranks) that we specified earlier are used.
+pathoscope.phy <- phyloseq(otu_table(patho.otu_mat, taxa_are_rows = TRUE), tax_table(patho.tax))
+# loading sample data
+pathoscope.phy = merge_phyloseq(pathoscope.phy, sample_data(sampledata))
+write.csv(otu_table(pathoscope.phy), file = "otu_mat.csv") #Save this in case you need it later.
+write.csv(tax_table(pathoscope.phy), file = "tax_mat.csv") #Save this in case you need it later.
+#tax_mat <- read.delim('tax_mat.tsv')
+```
+
+
+plot_sankey(pathoscope.phy, source = "phylum", target = "order", level_filter = NULL, source_filter = NULL)
+
+
+## Pathoscope Visualization
+### Steps
+1. Combine all taxa into taxa-level groups
+2. Transform abundances into relative abundances
+3. Filter out taxa with < 1% relative abundance.
+4. Make into a plot
+5. Display plot in R
+6. Save the plot as an image
+
+```{r pathoscope visualization}
+# Pathoscope Kingdom-level assignments chart
+patho.byking <- tax_glom(pathoscope.phy,taxrank = 'superkingdom') #combine all taxa into phylum-level groups
+patho.byking.tr <- transform_sample_counts(patho.byking, function (x) x / sum(x)) #transform abundances into relative abundances
+patho.byking.tr.f <- filter_taxa(patho.byking.tr, function (x) mean(x) > 1e-2, TRUE) #filter out phyla with < 1% relative abundance.
+patho.by_king_plot <- plot_bar(patho.byking.tr.f, "Sample", "Abundance", 'superkingdom', labs(y="Relative Abundance", title = "Pathoscope kingdom-level assignments"))
+ patho.by_king_plot <- patho.by_king_plot + 
+ theme_classic() + 
+ facet_grid( ~ Group_f, scales = "free", space = "free") 
+patho.by_king_plot
+ggsave("PS.by_kingdom.pdf", patho.by_king_plot) 
+###########################
+####  PHYLUM ####
+###########################
+# Pathoscope Phylum-level assignments chart
+patho.byphylum <- tax_glom(pathoscope.phy,taxrank = 'phylum') #combine all taxa into phylum-level groups
+patho.byphylum.tr <- transform_sample_counts(patho.byphylum, function (x) x / sum(x)) #transform abundances into relative abundances
+patho.byphylum.tr.f <- filter_taxa(patho.byphylum.tr, function (x) mean(x) > 1e-2, TRUE) #filter out phyla with < 1% relative abundance.
+patho.by_phylum_plot <- plot_bar(patho.byphylum.tr.f, "Sample", "Abundance", 'phylum', labs(y="Relative Abundance", title = "Pathoscope phylum-level assignments"))
+patho.by_phylum_plot <-  patho.by_phylum_plot + 
+  theme_classic() + 
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_phylum_plot
+ggsave("PS.by_phylum.pdf", patho.by_phylum_plot)
+###########################
+####  CLASS ####
+###########################
+  
+# Pathoscope Class-level assignments chart
+patho.byclass <- tax_glom(pathoscope.phy,taxrank = 'class') #combine all taxa into class-level groups
+patho.byclass.tr <- transform_sample_counts(patho.byclass, function (x) x / sum(x)) #transform abundances into relative abundances
+patho.byclass.tr.f <- filter_taxa(patho.byclass.tr, function (x) mean(x) > 1e-2, TRUE) #filter out phyla with < 1% relative abundance.
+patho.by_class_plot <- plot_bar(patho.byclass.tr.f, "Sample", "Abundance", 'class', labs(y="Relative Abundance", title = "Pathoscope class-level assignments")) + theme_classic()
+patho.by_class_plot <- patho.by_class_plot + 
+  theme_classic() + 
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_class_plot
+ggsave("PS.by_class.pdf", patho.by_class_plot)
+```
+
+
+
+## Additional Pathoscope Visualizations
+```{r additional pathoscope visualization}
+###########################
+####  ORDER ####
+###########################
+# Pathoscope Order-level assignments chart
+patho.byorder <- tax_glom(pathoscope.phy,taxrank = 'order')
+patho.byorder.tr <- transform_sample_counts(patho.byorder, function (x) x / sum(x))
+patho.byorder.tr.f <- filter_taxa(patho.byorder.tr, function (x) mean(x) > 1e-2, TRUE)
+patho.by_order_plot <- plot_bar(patho.byorder.tr.f, "Sample", "Abundance", 'order', labs(y="Relative Abundance", title = "Pathoscope order-level assignments"))
+patho.by_order_plot <- patho.by_order_plot + 
+  theme_classic() + 
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_order_plot
+ggsave("PS.by_order.pdf", patho.by_order_plot)
+###########################
+####  FAMILY ####
+###########################
+# Pathoscope Family-level assignments chart
+patho.byfamily <- tax_glom(pathoscope.phy,taxrank = 'family')
+patho.byfamily.tr <- transform_sample_counts(patho.byfamily, function (x) x / sum(x))
+patho.byfamily.tr.f <- filter_taxa(patho.byfamily.tr, function (x) mean(x) > 1e-2, TRUE)
+patho.by_family_plot <- plot_bar(patho.byfamily.tr.f, "Sample", "Abundance", 'family', labs(y="Relative Abundance", title = "Pathoscope family-level assignments"))
+patho.by_family_plot <- patho.by_family_plot + 
+  theme_classic() + 
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  theme(legend.key.size = unit(.2, "cm")) + 
+  guides(fill=guide_legend(ncol=1,byrow=TRUE)) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_family_plot
+ggsave("PS.by_family.pdf", patho.by_family_plot)
+###########################
+####  GENUS ####
+###########################
+# Pathoscope Genus-level assignments chart
+patho.bygenus <- tax_glom(pathoscope.phy,taxrank = 'genus')
+patho.bygenus.tr <- transform_sample_counts(patho.bygenus, function (x) x / sum(x))
+patho.bygenus.tr.f <- filter_taxa(patho.bygenus.tr, function (x) mean(x) > 1e-2, TRUE) 
+patho.by_genus_plot <- plot_bar(patho.bygenus.tr.f, "Sample", "Abundance", 'genus', labs(y="Relative Abundance", title = "Pathoscope genus-level assignments"))
+patho.by_genus_plot <- patho.by_genus_plot + 
+  theme_classic() + 
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  theme(legend.key.size = unit(.2, "cm")) + 
+  guides(fill=guide_legend(ncol=1,byrow=TRUE)) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_genus_plot
+ggsave("PS.by_genus.pdf", patho.by_genus_plot)
+###########################
+####  SPECIES ####
+###########################
+# Pathoscope Species-level assignments chart
+patho.byspecies <- tax_glom(pathoscope.phy,taxrank = 'species')
+patho.byspecies.tr <- transform_sample_counts(patho.byspecies, function (x) x / sum(x))
+patho.byspecies.tr.f <- filter_taxa(patho.byspecies.tr, function (x) mean(x) > 1e-2, TRUE)
+patho.by_species_plot <- plot_bar(patho.byspecies.tr.f, "Sample", "Abundance", 'species', labs(y="Relative Abundance", title = "Pathoscope species-level assignments"))
+patho.by_species_plot <- patho.by_species_plot + theme_classic()
+patho.by_species_plot <- patho.by_species_plot + 
+  theme(legend.position="bottom") +
+  theme(legend.key.size = unit(.2, "cm"), legend.text = element_text(size = 8), legend.title = element_blank()) + 
+  guides(fill=guide_legend(ncol=4,byrow=TRUE)) + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0)) +
+  facet_grid( ~ Group_f, scales = "free", space = "free")
+patho.by_species_plot
+ggsave("PS.by_species.pdf", patho.by_species_plot)
+```
+
+
+
+## Merging Samples into Cohort
+```{merging group samples}
+merged.phy = merge_samples(pathoscope.phy, "Group_f")
+sample_names(merged.phy)
+OTUnames10 = names(sort(taxa_sums(pathoscope.phy), TRUE)[1:10])
+patho10  = prune_taxa(OTUnames10,  pathoscope.phy)
+merge10 = prune_taxa(OTUnames10, merged.phy)
+KahembaCases_samples = sample_names(subset(sample_data(pathoscope.phy), Group_f=="Kahemba Cases"))
+print(KahembaCases_samples)
+otu_table(patho10)[, KahembaCases_samples]
+rowSums(otu_table(patho10)[, KahembaCases_samples])
+otu_table(merge10)["Kahemba Cases", ]
+write.csv(otu_table(merged.phy), file = "otu_mat_merged.csv") #Save this in case you need it later.
+```
+
+## Merged Pathoscope Visualizations
+```{r Merged pathoscope visualization}
+###########################
+####  KINGDOM ####
+###########################
+# Pathoscope Kingdom-level assignments chart
+patho.byking <- tax_glom(merged.phy,taxrank = 'superkingdom') #combine all taxa into phylum-level groups
+patho.byking.tr <- transform_sample_counts(patho.byking, function (x) x / sum(x)) #transform abundances into relative abundances
+patho.byking.tr.f <- filter_taxa(patho.byking.tr, function (x) mean(x) > 1e-2, TRUE) #filter out phyla with < 1% relative abundance.
+patho.by_king_plot <- plot_bar(patho.byking.tr.f, "Sample", "Abundance", 'superkingdom', labs(y="Relative Abundance", title = "Pathoscope kingdom-level assignments"))
+ patho.by_king_plot <- patho.by_king_plot + 
+ theme_classic() + 
+ facet_grid( ~ Group_f, scales = "free", space = "free") +
+ theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_king_plot
+ggsave("MPS.by_kingdom.pdf", patho.by_king_plot) 
+###########################
+####  PHYLUM ####
+###########################
+# Pathoscope Phylum-level assignments chart
+patho.byphylum <- tax_glom(merged.phy,taxrank = 'phylum') #combine all taxa into phylum-level groups
+patho.byphylum.tr <- transform_sample_counts(patho.byphylum, function (x) x / sum(x)) #transform abundances into relative abundances
+patho.byphylum.tr.f <- filter_taxa(patho.byphylum.tr, function (x) mean(x) > 1e-2, TRUE) #filter out phyla with < 1% relative abundance.
+patho.by_phylum_plot <- plot_bar(patho.byphylum.tr.f, "Sample", "Abundance", 'phylum', labs(y="Relative Abundance", title = "Pathoscope phylum-level assignments"))
+patho.by_phylum_plot <-  patho.by_phylum_plot + 
+  theme_classic() + 
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_phylum_plot
+ggsave("MPS.by_phylum.pdf", patho.by_phylum_plot)
+###########################
+####  CLASS ####
+###########################
+  
+# Pathoscope Class-level assignments chart
+patho.byclass <- tax_glom(merged.phy,taxrank = 'class') #combine all taxa into class-level groups
+patho.byclass.tr <- transform_sample_counts(patho.byclass, function (x) x / sum(x)) #transform abundances into relative abundances
+patho.byclass.tr.f <- filter_taxa(patho.byclass.tr, function (x) mean(x) > 1e-2, TRUE) #filter out phyla with < 1% relative abundance.
+patho.by_class_plot <- plot_bar(patho.byclass.tr.f, "Sample", "Abundance", 'class', labs(y="Relative Abundance", title = "Pathoscope class-level assignments")) + theme_classic()
+patho.by_class_plot <- patho.by_class_plot + 
+  theme_classic() + 
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_class_plot
+ggsave("MPS.by_class.pdf", patho.by_class_plot)
+###########################
+####  ORDER ####
+###########################
+# Pathoscope Order-level assignments chart
+patho.byorder <- tax_glom(merged.phy,taxrank = 'order')
+patho.byorder.tr <- transform_sample_counts(patho.byorder, function (x) x / sum(x))
+patho.byorder.tr.f <- filter_taxa(patho.byorder.tr, function (x) mean(x) > 1e-2, TRUE)
+patho.by_order_plot <- plot_bar(patho.byorder.tr.f, "Sample", "Abundance", 'order', labs(y="Relative Abundance", title = "Pathoscope order-level assignments"))
+patho.by_order_plot <- patho.by_order_plot + 
+  theme_classic() + 
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_order_plot
+ggsave("MPS.by_order.pdf", patho.by_order_plot)
+###########################
+####  FAMILY ####
+###########################
+# Pathoscope Family-level assignments chart
+patho.byfamily <- tax_glom(merged.phy,taxrank = 'family')
+patho.byfamily.tr <- transform_sample_counts(patho.byfamily, function (x) x / sum(x))
+patho.byfamily.tr.f <- filter_taxa(patho.byfamily.tr, function (x) mean(x) > 1e-2, TRUE)
+patho.by_family_plot <- plot_bar(patho.byfamily.tr.f, "Sample", "Abundance", 'family', labs(y="Relative Abundance", title = "Pathoscope family-level assignments"))
+patho.by_family_plot <- patho.by_family_plot + 
+  theme_classic() + 
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  theme(legend.key.size = unit(.2, "cm")) + 
+  guides(fill=guide_legend(ncol=1,byrow=TRUE)) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_family_plot
+ggsave("MPS.by_family.pdf", patho.by_family_plot)
+###########################
+####  GENUS ####
+###########################
+# Pathoscope Genus-level assignments chart
+patho.bygenus <- tax_glom(merged.phy,taxrank = 'genus')
+patho.bygenus.tr <- transform_sample_counts(patho.bygenus, function (x) x / sum(x))
+patho.bygenus.tr.f <- filter_taxa(patho.bygenus.tr, function (x) mean(x) > 1e-2, TRUE) 
+patho.by_genus_plot <- plot_bar(patho.bygenus.tr.f, "Sample", "Abundance", 'genus', labs(y="Relative Abundance", title = "Pathoscope genus-level assignments"))
+patho.by_genus_plot <- patho.by_genus_plot + 
+  theme_classic() + 
+  facet_grid( ~ Group_f, scales = "free", space = "free") + 
+  theme(legend.key.size = unit(.2, "cm")) + 
+  guides(fill=guide_legend(ncol=1,byrow=TRUE)) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+patho.by_genus_plot
+ggsave("MPS.by_genus.pdf", patho.by_genus_plot)
+###########################
+####  SPECIES ####
+###########################
+# Pathoscope Species-level assignments chart
+patho.byspecies <- tax_glom(merged.phy,taxrank = 'species')
+patho.byspecies.tr <- transform_sample_counts(patho.byspecies, function (x) x / sum(x))
+patho.byspecies.tr.f <- filter_taxa(patho.byspecies.tr, function (x) mean(x) > 1e-2, TRUE)
+patho.by_species_plot <- plot_bar(patho.byspecies.tr.f, "Sample", "Abundance", 'species', labs(y="Relative Abundance", title = "Pathoscope species-level assignments"))
+patho.by_species_plot <- patho.by_species_plot + theme_classic()
+patho.by_species_plot <- patho.by_species_plot + 
+  theme(legend.position="bottom") +
+  theme(legend.key.size = unit(.2, "cm"), legend.text = element_text(size = 8), legend.title = element_blank()) + 
+  guides(fill=guide_legend(ncol=2,byrow=TRUE)) + 
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0)) +
+  facet_grid( ~ Group_f, scales = "free", space = "free")
+patho.by_species_plot
+ggsave("MPS.by_species.pdf", patho.by_species_plot, width = 7, height = 7, units = "in")
+```
+
+
+
+<br />
+<br />
+
+---
+---
+<br />
+
+# FMT Stats (Alpha & Beta Diversity)
+## Load appropriate packages
+```{load stat packages}
+#install.packages("devtools")
+#install.packages("picante")
+#install.packages("TSA")
+#install.packages("nortest")
+#install.packages("multcomp")
+#install.packages("car")
+#install_github("microbiome/microbiome")
+#install.packages("mvabund")
+#install.packages("MASS")
+#install.packages("geepack")
+#install.packages("doBy")
+#install.packages("lattice")
+#install.packages("MuMIn")
+#install.packages("phangorn")
+#install.packages("DESeq2")
+#install.packages("FSA")
+library("devtools")
+library("picante")
+library("TSA")
+library("nortest")
+library("multcomp")
+library("car")
+library("microbiome")
+library("mvabund")
+library("MASS")
+library("geepack")
+library("doBy")
+library("lattice")
+library("MuMIn")
+library("phangorn")
+library("DESeq2")
+library("FSA")
+```
+
+
+
+## Set theme for all plots
+```{theme for stats}
+theme_set(theme_bw())
+```
+
+
+
+## Intergers
+```{get intergers}
+#sums of the minimum values in the columns for the otu table derived from the data file
+min(colSums(otu_table(pathoscope.phy)))
+#integer indicating number of taxa
+#ntaxa = get number of taxa
+#nsamples = count number of samples
+ntaxa(pathoscope.phy)
+nsamples(pathoscope.phy)
+sample_names(pathoscope.phy)[1:10]
+taxa_names(pathoscope.phy)[1:10]
+sample_variables(pathoscope.phy)[1:3]
+rank_names(pathoscope.phy)
+get_taxa_unique(pathoscope.phy, "class")
+```
+
+
+
+## Using Negative Binomial for obtaining normalized Read Counts
+```{r negative binomial}
+#the following code is deseq2 for negative binomial in microbiome differential abundance testing
+# remove the control
+konzo.phy <- prune_samples(colnames(pathoscope.phy@otu_table@.Data)!= "Konzo-control", pathoscope.phy)
+diagdds = phyloseq_to_deseq2(konzo.phy, ~Group_f) # Any variable of the metadata would work. You need one to create the DESeq object
+# Calculate geometric means; na.rm is remove NAs
+gm_mean = function(x, na.rm=TRUE){
+  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+}
+geoMeans = apply(counts(diagdds), 1, gm_mean)
+# Estimate size factors
+diagdds = estimateSizeFactors(diagdds, geoMeans = geoMeans)
+# Get Normalized read counts
+normcounts <- counts(diagdds, normalized = TRUE)
+# Round read counts
+normcountsrd <- round(normcounts, digits = 0)
+# Transform matrix of normalized counts to phyloseq object
+otu.normalized <- otu_table(normcountsrd, taxa_are_rows = TRUE)
+# Replace otu_table in original phyloseq object
+otu_table(konzo.phy) <- otu.normalized
+write.csv(otu.normalized,file="SeqsTaxon_fs2R_deseq.csv")
+```
+
+
+
+## Analysis of all samples with binomail negative
+```{r analysis w binomial negative}
+otuD <- as.data.frame(t(otu_table(konzo.phy)))
+diversity <- estimate_richness(konzo.phy)
+diversity <- cbind(sample_data(konzo.phy),diversity) 
+diversity$Group_f <- as.factor(diversity$Group_f)
+```
+
+
+
+## Function multiplot
+```{r multiplot}
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+  
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+  
+  numPlots = length(plots)
+  
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                     ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+  
+  if (numPlots==1) {
+    print(plots[[1]])
+    
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+    
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+      
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+
+
+
+## Boxplots for all
+```{r boxplot for all}
+observed <- ggplot(diversity, aes(factor(Group_f), Observed))
+observed2 <- observed + 
+  geom_boxplot(aes(fill = factor(Group_f)), outlier.colour = "black", outlier.size = 1) + 
+  geom_jitter(size=1, shape=1) + 
+  ggtitle("Otu richness") + 
+  labs(y = "OTU richness") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+observed2
+chao <- ggplot(diversity, aes(factor(Group_f), Chao1))
+chao2 <- chao + 
+  geom_boxplot(aes(fill = factor(Group_f)), outlier.colour = "black", outlier.size = 1) +
+  scale_y_continuous(limits=c(0,1000)) +
+  geom_jitter(size=1,shape=1) +
+  ggtitle("Chao1 richness") +
+  labs(y = "Chao1 richness") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+chao2
+shan <- ggplot(diversity, aes(factor(Group_f), Shannon))
+shan2 <- shan +
+  geom_boxplot(aes(fill = factor(Group_f)), outlier.colour = "black", outlier.size = 1) +
+  geom_jitter(size=1,shape=1) +
+  ggtitle("Shannon diversity") +
+  labs(y = "Shannon diversity") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+shan2
+ACE <- ggplot(diversity, aes(factor(Group_f), ACE))
+ACE2 <- ACE + 
+  geom_boxplot(aes(fill = factor(Group_f)), outlier.colour = "black", outlier.size = 1) +
+  geom_jitter(size=1,shape=1) +
+  ggtitle("ACE") +
+  labs(y = "ACE") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+ACE2
+Simpson <- ggplot(diversity, aes(factor(Group_f), Simpson))
+Simpson2 <- Simpson +
+  geom_boxplot(aes(fill = factor(Group_f)), outlier.colour = "black", outlier.size = 1) +
+  geom_jitter(size=1,shape=1) +
+  ggtitle("Simpson") +
+  labs(y = "Simpson") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+Simpson2
+Fisher <- ggplot(diversity, aes(factor(Group_f), Fisher))
+Fisher2 <- Fisher +
+  geom_boxplot(aes(fill = factor(Group_f)), outlier.colour = "black", outlier.size = 1) +
+  geom_jitter(size=1,shape=1) +
+  ggtitle("Fisher") +
+  labs(y = "Fisher") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+Fisher2
+pdf(file = "adiv_type.pdf", pointsize = 15, width = 10, height = 10)
+multiplot(observed2, chao2, shan2, ACE2,Simpson2,Fisher2,cols=3)  #### to run this fucntion, run function multiplot first
+dev.off()
+```
+
+
+
+## Comparison of all alpha diversity (adiv) indexes
+```{r adiv for all}
+#these are found in the diverstiy data set
+lm_obs <- lm(Observed~Group_f, diversity)
+summary(lm_obs)
+capture.output(summary(lm_obs), file="adiv_lm.txt") 
+anova(lm_obs)
+capture.output(anova(lm_obs), append=TRUE, file="adiv_lm.txt")
+lm_chao <- lm(Chao1~Group_f, diversity)
+summary(lm_chao)
+capture.output(summary(lm_chao), append=TRUE, file="adiv_lm.txt") 
+anova(lm_chao)
+capture.output(anova(lm_chao), append=TRUE, file="adiv_lm.txt")
+lm_shan <- lm(Shannon~Group_f, diversity)
+summary(lm_shan)
+capture.output(summary(lm_shan), append=TRUE, file="adiv_lm.txt") 
+anova(lm_shan)
+capture.output(anova(lm_shan), append=TRUE, file="adiv_lm.txt")
+lm_ace <- lm(ACE~Group_f, diversity)
+summary(lm_ace)
+capture.output(summary(lm_ace), append=TRUE, file="adiv_lm.txt")
+anova(lm_ace)
+capture.output(anova(lm_ace), append=TRUE, file="adiv_lm.txt")
+lm_simp <- lm(Simpson~Group_f, diversity)
+summary(lm_simp)
+capture.output(summary(lm_simp), append=TRUE, file="adiv_lm.txt")
+anova(lm_simp)
+capture.output(anova(lm_simp), append=TRUE, file="adiv_lm.txt")
+lm_fish <- lm(Fisher~Group_f, diversity)
+summary(lm_fish)
+capture.output(summary(lm_fish), append=TRUE, file="adiv_lm.txt")
+anova(lm_fish)
+capture.output(anova(lm_fish), append=TRUE, file="adiv_lm.txt")
+```
+
+
+
+## Anova Tests for all
+```{adiv anova all}
+adiv_simp <- aov(Simpson~Group_f,data=diversity)
+summary(adiv_simp)
+capture.output(summary(adiv_simp), file="alpha_div.txt") 
+jpeg(filename = "Anova_simpson.jpg", pointsize = 15, width = 10, height = 10, units = "in", res = 500)
+par(mfrow=c(2,2))
+plot(adiv_simp)
+par(mfrow=c(1,1))
+TukeyHSD(adiv_simp)
+capture.output(TukeyHSD(adiv_simp), append=TRUE, file="alpha_div.txt") 
+tukey_simp <- TukeyHSD(adiv_simp, "Group_f", ordered=TRUE)
+write.csv(data.frame(tukey_simp$Group_f), 'TukeyHSD_results.csv')
+adiv_shan <- aov(Shannon~Group_f,data=diversity)
+summary(adiv_shan)
+capture.output(summary(adiv_shan), append=TRUE, file="alpha_div.txt") 
+TukeyHSD(adiv_shan)
+capture.output(TukeyHSD(adiv_shan), append=TRUE, file="alpha_div.txt") 
+tukey_shan <- TukeyHSD(adiv_shan, "Group_f", ordered=TRUE)
+```
+
+
+
+## Continuation of adiv for all - KW test
+```{r adiv KW}
+kw_simp <- kruskal.test(Simpson~Group_f,data=diversity)
+kw_simp
+capture.output(kw_simp, file="adiv_kw.txt") 
+dunn_simp = dunnTest(Simpson~Group_f,
+              data=diversity,
+              method="bh")
+dunn_simp
+capture.output(dunn_simp, append=TRUE, file="adiv_kw.txt") 
+kw_shan <- kruskal.test(Shannon~Group_f,data=diversity)
+kw_shan
+capture.output(kw_shan, append=TRUE, file="adiv_kw.txt") 
+dunn_shan = dunnTest(Shannon~Group_f,
+              data=diversity,
+              method="bh")
+dunn_shan
+capture.output(dunn_shan, append=TRUE, file="adiv_kw.txt") 
+```
+
+
+
+## Comparison of ALL beta div (b-div) indexes
+```{r bdiv for all samples}
+brayd <- phyloseq::distance(konzo.phy, method="bray")
+jaccd <- phyloseq::distance(konzo.phy, method="jaccard")
+jsd <- phyloseq::distance(konzo.phy, method="jsd")
+chaod <- phyloseq::distance(konzo.phy, method="chao")
+```
+
+
+
+## bdiv - Adonis tests for all
+```{r bdiv adonis for all only}
+bdiv_bray <- adonis(brayd ~ diversity$Group_f, perm=10000); bdiv_bray
+capture.output(bdiv_bray, file="bdiv_adonis.txt") 
+bdiv_jaccd <- adonis(jaccd ~ diversity$Group_f, perm=10000); bdiv_jaccd
+capture.output(bdiv_jaccd, append=TRUE, file="bdiv_adonis.txt") 
+bdiv_jsd <- adonis(jsd ~ diversity$Group_f, perm=10000); bdiv_jsd
+capture.output(bdiv_jsd, append=TRUE, file="bdiv_adonis.txt") 
+bdiv_chao <- adonis(chaod ~ diversity$Group_f, perm=10000); bdiv_chao
+capture.output(bdiv_chao, append=TRUE, file="bdiv_adonis.txt") 
+```
+
+
+## bdiv - SAMPLE TREES for all
+```{r generate sample trees}
+pdf(file = "bdiv_UPGMA.pdf", pointsize = 15, width = 12, height = 15)
+UPGMA <- upgma(brayd)
+plot(UPGMA, main="UPGMA")
+dev.off()
+pdf(file = "bdiv_NJtrees.pdf", pointsize = 15, width = 12, height = 20)
+par(mfrow=c(2,2))
+NJb  <- NJ(brayd)
+plot(NJb, main = "NJ bray")
+NJj  <- NJ(jaccd)
+plot(NJj, main = "NJ jaccard")
+NJjsd  <- NJ(jsd)
+plot(NJjsd, main = "NJ jsd")
+NJc  <- NJ(chaod)
+plot(NJc, main = "NJ chao")
+dev.off()
+```
+
+## Ordination for all
+```{r pcoa}
+#PCoA is a scaling or ordination method that starts with a matrix of similarities or dissimilarities between a set of individuals and aims to produce a low-dimensional graphical plot of the data in such a way that distances between points in the plot are close to original dissimilarities
+#PCoA of all samples
+p1 = plot_ordination(konzo.phy, ordinate(konzo.phy, method="PCoA", dist="bray"), type = "samples", color = "Group_f") 
+PB <- p1 + 
+  geom_point(size = 4) + 
+  ggtitle("PCoA Bray") +
+  xlab("PCoA 1") +
+  ylab("PCoA 2") +
+  labs(color = "Groups")
+p2 = plot_ordination(konzo.phy, ordinate(konzo.phy, method="PCoA", dist="jaccard"), type = "samples", color = "Group_f")  
+PJa <- p2 + 
+  geom_point(size = 4) + 
+  ggtitle("PCoA Jaccard") +
+  xlab("PCoA 1") +
+  ylab("PCoA 2") +
+  labs(color = "Groups")
+p1 = plot_ordination(konzo.phy, ordinate(konzo.phy, method="PCoA", dist="jsd"), type = "samples", color = "Group_f") 
+Pjs <- p1 + 
+  geom_point(size = 4) + 
+  ggtitle("PCoA jsd") +
+  xlab("PCoA 1") +
+  ylab("PCoA 2") +
+  labs(color = "Groups")
+p1 = plot_ordination(konzo.phy, ordinate(konzo.phy, method="PCoA", dist="chaod"), type = "samples", color = "Group_f") 
+Pch <- p1 + 
+  geom_point(size = 4) + 
+  ggtitle("PCoA chaod") +
+  xlab("PCoA 1") +
+  ylab("PCoA 2") +
+  labs(color = "Groups")
+pdf(file = "PCoA_type.pdf", pointsize = 15, width = 10, height = 10)
+multiplot(PB, PJa, Pjs, Pch,cols=2)  #### to run this fucntion I have to run function multiplot first
+dev.off()
+```
+
+
+
+## NMDS Ordination for all
+```{r NMDS ordinations for all}
+bray_dist <- phyloseq::distance(konzo.phy, method = "bray")
+bray_NMDS <- ordinate(konzo.phy, method = "NMDS", distance = "bray")
+bray_NMDS$stress
+bray_plot <- plot_ordination(konzo.phy, bray_NMDS)
+jac_dist <- phyloseq::distance(konzo.phy, method = "jaccard", binary = TRUE)
+jac_NMDS <- ordinate(konzo.phy, method = "NMDS", distance = "jaccard", binary = TRUE)
+jac_NMDS$stress
+jac_plot <- plot_ordination(konzo.phy, jac_NMDS)
+BC_plot <- ggplot(bray_plot$data, aes(NMDS1, NMDS2, color=konzo.phy@sam_data$Group_f)) +
+  geom_point(size=4, alpha = 1) +
+  ggtitle("NMDS Bray-Curtis") +
+  xlab("NMDS 1") +
+  ylab("NMDS 2") +
+  labs(color = "Groups")
+  theme_minimal()
+BC_plot
+ggsave("BC_plot.pdf", plot = BC_plot, width = 9, height = 6)
+Jac_plot <- ggplot(jac_plot$data, aes(NMDS1, NMDS2, color=konzo.phy@sam_data$Group_f)) +
+  geom_point(size=4, alpha = 1) +
+  ggtitle("NMDS Jaccard") +
+  xlab("NMDS 1") +
+  ylab("NMDS 2") +
+  labs(color = "Groups") +
+  theme_minimal()
+Jac_plot
+ggsave("Jac_plot.pdf", plot = Jac_plot, width = 9, height = 6)
+pdf(file = "Ordination.pdf", pointsize = 15, width = 10, height = 10)
+multiplot(PB, PJa, BC_plot, Pjs, Pch, Jac_plot, cols=2)  #### to run this fucntion I have to run function multiplot first
+dev.off()
+pdf(file = "NMDS_Ordination.pdf", pointsize = 15, width = 10, height = 10)
+multiplot(BC_plot, Jac_plot, cols=1)  #### to run this fucntion I have to run function multiplot first
+dev.off()
+## 55 and 66 are the outliers. 
+```
+<br />
+<br />
+
+---
+---
+<br />
+
+## Beta Diversity Stats for just the Kahemba Village
+```{Stats with just Kahemba Village}
+# remove the control and all Kinshasa samples
+konzo.phy <- prune_samples(colnames(pathoscope.phy@otu_table@.Data)!= "Konzo-control", pathoscope.phy)
+Kahemba.phy = subset_samples(konzo.phy, konzo.phy@sam_data$Group != 'Kinshasa Control')
+diagdds = phyloseq_to_deseq2(Kahemba.phy, ~Group_f) # Any variable of the metadata would work. You need one to create the DESeq object
+# Calculate geometric means; na.rm is remove NAs
+gm_mean = function(x, na.rm=TRUE){
+  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+}
+geoMeans = apply(counts(diagdds), 1, gm_mean)
+# Estimate size factors
+diagdds = estimateSizeFactors(diagdds, geoMeans = geoMeans)
+# Get Normalized read counts
+normcounts <- counts(diagdds, normalized = TRUE)
+# Round read counts
+normcountsrd <- round(normcounts, digits = 0)
+# Transform matrix of normalized counts to phyloseq object
+otu.normalized <- otu_table(normcountsrd, taxa_are_rows = TRUE)
+# Replace otu_table in original phyloseq object
+otu_table(Kahemba.phy) <- otu.normalized
+#write.csv(otu.normalized,file="Kahemba_SeqsTaxon_fs2R_deseq.csv")
+```
+
+
+
+## Analysis of Kahemba Village with binomial negative
+```{r analysis w binomial negative for kahemba village}
+otuD <- as.data.frame(t(otu_table(Kahemba.phy)))
+diversity <- estimate_richness(Kahemba.phy)
+diversity <- cbind(sample_data(Kahemba.phy),diversity) 
+diversity$Group_f <- as.factor(diversity$Group_f)
+```
+
+
+
+## Comparison of kahemba village beta div (b-div) indexes
+```{r for kahemba village samples}
+brayd <- phyloseq::distance(Kahemba.phy, method="bray")
+jaccd <- phyloseq::distance(Kahemba.phy, method="jaccard")
+jsd <- phyloseq::distance(Kahemba.phy, method="jsd")
+chaod <- phyloseq::distance(Kahemba.phy, method="chao")
+```
+
+
+
+## bdiv - Adonis tests for kahemba village
+```{r for kahemba village only}
+bdiv_bray_K <- adonis(brayd ~ diversity$Group_f, perm=10000); bdiv_bray_K
+capture.output(bdiv_bray_K, file="Kahemba_bdiv_adonis.txt") 
+bdiv_jacc_K <- adonis(jaccd ~ diversity$Group_f, perm=10000); bdiv_jacc_K
+capture.output(bdiv_jacc_K, append=TRUE, file="Kahemba_bdiv_adonis.txt") 
+bdiv_jsd_K <- adonis(jsd ~ diversity$Group_f, perm=10000); bdiv_jsd_K
+capture.output(bdiv_jsd_K, append=TRUE, file="Kahemba_bdiv_adonis.txt") 
+bdiv_chao_K <- adonis(chaod ~ diversity$Group_f, perm=10000); bdiv_chao_K
+capture.output(bdiv_chao_K, append=TRUE, file="Kahemba_bdiv_adonis.txt") 
+```
+
+---
+---
+## Merged Beta diversity
+```{merged beta div}
+merged.phy <- prune_samples(merged.phy@sam_data@row.names!= "Control", merged.phy)
+diagdds = phyloseq_to_deseq2(merged.phy, ~Group_f) # Any variable of the metadata would work. You need one to create the DESeq object
+# Calculate geometric means; na.rm is remove NAs
+gm_mean = function(x, na.rm=TRUE){
+  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+}
+geoMeans = apply(counts(diagdds), 1, gm_mean)
+# Estimate size factors
+diagdds = estimateSizeFactors(diagdds, geoMeans = geoMeans)
+# Get Normalized read counts
+normcounts <- counts(diagdds, normalized = TRUE)
+# Round read counts
+normcountsrd <- round(normcounts, digits = 0)
+# Transform matrix of normalized counts to phyloseq object
+otu.normalized <- otu_table(normcountsrd, taxa_are_rows = TRUE)
+# Replace otu_table in original phyloseq object
+otu_table(merged.phy) <- otu.normalized
+```
+
+```{r analysis w binomial negative for mergede}
+otuD <- as.data.frame(t(otu_table(merged.phy)))
+diversity <- estimate_richness(merged.phy)
+diversity <- cbind(sample_data(merged.phy),diversity) 
+diversity$Group_f <- as.factor(diversity$Group_f)
+```
+
+
+```{r merged boxplot}
+observed <- ggplot(diversity, aes(factor(row.names(diversity)), Observed))
+observed2 <- observed + 
+  geom_boxplot(aes(fill = factor(row.names(diversity))), outlier.colour = "black", outlier.size = 1) + 
+  geom_jitter(size=1, shape=1) + 
+  ggtitle("Otu richness") + 
+  labs(y = "OTU richness") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+observed2
+chao <- ggplot(diversity, aes(factor(row.names(diversity)), Chao1))
+chao2 <- chao + 
+  geom_boxplot(aes(fill = factor(row.names(diversity))), outlier.colour = "black", outlier.size = 1) +
+  scale_y_continuous(limits=c(0,2000)) +
+  geom_jitter(size=1,shape=1) +
+  ggtitle("Chao1 richness") +
+  labs(y = "Chao1 richness") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+chao2
+shan <- ggplot(diversity, aes(factor(row.names(diversity)), Shannon))
+shan2 <- shan +
+  geom_boxplot(aes(fill = factor(row.names(diversity))), outlier.colour = "black", outlier.size = 1) +
+  geom_jitter(size=1,shape=1) +
+  ggtitle("Shannon diversity") +
+  labs(y = "Shannon diversity") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+shan2
+ACE <- ggplot(diversity, aes(factor(row.names(diversity)), ACE))
+ACE2 <- ACE + 
+  geom_boxplot(aes(fill = factor(row.names(diversity))), outlier.colour = "black", outlier.size = 1) +
+  geom_jitter(size=1,shape=1) +
+  ggtitle("ACE") +
+  labs(y = "ACE") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+ACE2
+Simpson <- ggplot(diversity, aes(factor(row.names(diversity)), Simpson))
+Simpson2 <- Simpson +
+  geom_boxplot(aes(fill = factor(row.names(diversity))), outlier.colour = "black", outlier.size = 1) +
+  geom_jitter(size=1,shape=1) +
+  ggtitle("Simpson") +
+  labs(y = "Simpson") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+Simpson2
+Fisher <- ggplot(diversity, aes(factor(row.names(diversity)), Fisher))
+Fisher2 <- Fisher +
+  geom_boxplot(aes(fill = factor(row.names(diversity))), outlier.colour = "black", outlier.size = 1) +
+  geom_jitter(size=1,shape=1) +
+  ggtitle("Fisher") +
+  labs(y = "Fisher") +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=0))
+Fisher2
+pdf(file = "merged_adiv_type.pdf", pointsize = 15, width = 10, height = 10)
+multiplot(observed2, chao2, shan2, ACE2,Simpson2,Fisher2,cols=3)  #### to run this fucntion I have to run function multiplot first
+dev.off()
+```
+
+---
+---
+<br />
+
+# Sankey Plot
+```{r sankey plot}
+#install.packages("shinythemes")
+#install.packages("shiny")
+#install_github("cpauvert/psadd")
+#install_github("gtsitsiridis/MetaMap")
+#install.packages(“ggplot2”, version=”3.0.0”)
+#devtools::install_github('ropensci/plotly')
+library(MetaMap)
+colnames(pathoscope.phy@tax_table)
+[1] "superkingdom" "phylum"       "class"       
+sankey <- plot_sankey(konzo.phy, source = "phylum", target = "species", level_filter = NULL, source_filter = NULL, normalized = T)
+sankey
+```
+
+---
+---
+<br />
+
+# Alluvial Plot
+```{alluvial plot}
+# Setup
+library("ggplot2")
+library("rentrez")
+library("XML")
+library("ggrepel")
+library("phyloseq")
+library("plyr")
+library("vegan")
+library("DESeq2")
+library("reshape2")
+library("colorspace")
+library("RGraphics")
+library(picante)
+library(TSA)
+library(nortest)
+library(multcomp)
+library(car)
+library(mvabund)
+#install.packages("alluvial")
+library(alluvial)
+library(biomformat)
+library(biom)
+library(reshape2)
+require(grid)
+# read in phyloseq's object elements
+datos <- konzo.phy
+min(colSums(otu_table(datos))) 
+# checking phyloseq object's attributes
+sample_names(datos)[1:10]
+rank_names(datos)
+colnames(tax_table(datos)) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+tax_table(datos)[1:10]
+View(otu_table(datos))
+```
+
+## Alluvial Plot visualizations 
+```{r Alluvial plot visualizations}
+###########################
+####  CLASS ####
+###########################
+# agglomerate data by taxonomic rank. In this case, 'Class'
+glom <- tax_glom(datos, taxrank='class')
+# subset taxa of interest
+# glom <- subset_taxa(glom, tax_table(glom)[,3] %in% c("Actinobacteria", "Bacilli", "Bacteroidia", "Clostridia", "Coriobacteriia", "Gammaproteobacteria", "Negativicutes"))
+glom.tr <- transform_sample_counts(glom, function(x) x / sum(x) )
+glom.tr.f <- filter_taxa(glom.tr, function (x) mean (x) > 1e-2, TRUE)
+# get time columns from sample_data
+sample_data(glom.tr.f)[,3] -> glom_time
+glom_time$sample = rownames(glom_time)
+rownames(glom_time) = NULL
+#get counts from phyloseq object
+glom_otu <- t(otu_table(glom.tr.f))
+cbind(glom_time, glom_otu) -> glom_otu_time.w
+# clean up the data frame
+row.names(glom_otu_time.w) <- NULL
+glom_otu_time.w$sample <- NULL
+# average taxa proportions by time
+glom_otu_time.w$Group_f <- factor(glom_otu_time.w$Group_f, ordered = FALSE, levels=c("Kinshasa Control", "Kahemba Control", "Kahemba Cases")) 
+ddply(glom_otu_time.w,"Group_f",numcolwise(mean))-> glom_otu_time.w
+glom_otu_time.w$Group_f <- c("Kinshasa Control", "Kahemba Control", "Kahemba Cases")
+g2 <- as(tax_table(glom.tr.f), "matrix")
+g1 = as.data.frame(g2)
+rownames(g1)
+g1$taxid <- rownames(g1)
+rownames(g1) = NULL
+g1
+colnames(glom_otu_time.w) <- g1$class[match(colnames(glom_otu_time.w), g1$taxid)]
+colnames(glom_otu_time.w)
+colnames(glom_otu_time.w)[1] <- "Cohort"
+# take proportions
+glom_otu_time.w[, -1] <- lapply( glom_otu_time.w[ , -1], function(x) x/sum(x, na.rm=TRUE) )
+# make sure measure.vars is sorted alphabetically
+melt(glom_otu_time.w, id.vars=c("Cohort"), measure.vars=c("Actinobacteria", "Bacilli", "Bacteroidia", "Clostridia", "Coriobacteriia", "Erysipelotrichia", "Gammaproteobacteria", "Negativicutes"), variable.name="taxa", value.name="proportion") -> glom_otu_time.l
+# optional conversion to percentages
+#glom_otu_time.l$proportion <- glom_otu_time.l$proportion*100
+#colors
+cols <- c("Coriobacteriia" = "#C77966", "Negativicutes" = "#343642", "Clostridia" = "#2980B9", "Actinobacteria" = "#DF9A57", "Bacteroidia" = "#611427", "Bacilli" = "#385129",  "Gammaproteobacteria" = "#DC3522")
+##### PLOT #####
+# reorder columns. Needs to be otu, time, value
+glom_otu_time.l[c(2,1,3)] -> glom_otu_time.l
+glom_otu_time.l$Cohort <- as.factor(glom_otu_time.l$Cohort)
+glom_otu_time.l$Cohort <- factor(glom_otu_time.l$Cohort, ordered = TRUE, levels=c("Kinshasa Control", "Kahemba Control", "Kahemba Cases"))
+pdf(file = "EV_Konzo_alluvial_class_f.pdf", pointsize = 15, width = 14, height = 10)
+alluvial_ts(glom_otu_time.l, wave = .3, ygap = 5, plotdir = 'centred', alpha=.85, grid = TRUE, rankup = FALSE, grid.lwd = 5, xmargin = 0.3, lab.cex = .7, xlab = '', ylab = '', border = NA, axis.cex = .7, leg.cex = .7, title.cex = 1, title = "EV Konzo Class level Alluvial")
+dev.off()
+```
