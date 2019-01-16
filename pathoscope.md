@@ -34,14 +34,21 @@ In both of these files you will see the same format:
 ---
 
 Once finished, you need to do one more thing. 
-Run the following command on your local computer. This command downloads the `tsv` files from each sample. The `tsv` files are the output from PathoID that we will take into R to visualize.
+Run the following commands. This puts all the `tsv` files from each sample into folders and then downloads them. The `tsv` files are the output from PathoID that we will take into R to visualize.
 
 Outside of your analysis folder, make directories called `bac` and `human`
 ```
 mkdir bac
 mkdir human
-cat ../samps.txt | while read f; do cp $f/human/pathoid-sam-report.tsv path/to/human/${f}_pathoid-sam-report.tsv ; echo $f; done
+cd Analysis
+cat ../samps.txt | while read f; do cp $f/human/pathoid-sam-report.tsv ../human/${f}_pathoid-sam-report.tsv ; echo $f; done
+cat ../samps.txt | while read f; do cp $f/bac/pathoid-sam-report.tsv ../bac/${f}_pathoid-sam-report.tsv ; echo $f; done
 ```
->Remember, you will need to replace a few things. As an example for you, I have used my path and username.
+From your computer, make a folder called `pathoscope_output`, and copy the files from your bac and human folders to this folder.
+```
+mkdir pathoscope_output
+rsync -avh rebeccaclement@login.colonialone.gwu.edu:lustre/Meni/bac .
+rsync -avh rebeccaclement@login.colonialone.gwu.edu:lustre/Meni/human .
+```
 >
 
