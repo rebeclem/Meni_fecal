@@ -23,7 +23,7 @@
 <br />
 <br />
 
-To run analysis, open the `konzo_visualization.Rmd` file in R-Studio. The file is located under the `R_analysis` directory. 
+To run analysis, open the `konzo_visualization.Rmd` file in R-Studio. 
 
 If you do not have R-Studio, download the R-studio desktop version [here](https://www.rstudio.com/products/rstudio/download/#download). 
 
