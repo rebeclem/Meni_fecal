@@ -27,7 +27,7 @@ done &
 
 2nd, pull all the mapped read names from the `bam` file.
 ```
-for d in Konzo*; do 
+for d in *; do 
     samtools view -F 4 $d/human/outalign.bam | cut -f1 > $d/human/tmp.txt && echo $d &
 done &
 ```
@@ -36,7 +36,7 @@ done &
 This is counting the number of *unique* reads that mapped to the human database and writes the number of unique reads and sample name to a file.
 ```
 echo -e "Samp\tReads" >> reads_hg.txt
-for d in Konzo*; do 
+for d in *; do 
    readnum=$(cat $d/human/tmp.txt | python ../scripts/count_uniq.py)
    echo -e "${d}\t${readnum}" >> reads_hg.txt
    echo $d $readnum
@@ -53,14 +53,14 @@ done
 
 1st, convert the `sam` file to a `bam` file.
 ```
-for d in Konzo*; do 
+for d in *; do 
     samtools view -b $d/bac/outalign.sam > $d/bac/outalign.bam && echo "Converted $d/outalign.sam" &
 done & 
 ```
 
 2nd, pull all the mapped read names from the `bam` file.
 ```
-for d in Konzo*; do 
+for d in *; do 
     samtools view -F 4 $d/bac/outalign.bam | cut -f1 > $d/bac/tmp.txt && echo $d &
 done &
 ```
@@ -69,7 +69,7 @@ done &
 This is counting the number of *unique* reads that mapped to the bacteria databases and writes the number of unique reads and sample name to a file.
 ```
 echo -e "Samp\tReads" >> reads_bac.txt
-for d in Konzo*; do 
+for d in *; do 
    readnum=$(cat $d/bac/tmp.txt | python ../scripts/count_uniq.py)
    echo -e "${d}\t${readnum}" >> reads_bac.txt
    echo $d $readnum
