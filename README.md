@@ -14,3 +14,8 @@ Based off [Keylie's Konzo pipeline](https://github.com/kmgibson/EV_konzo)
 5) [Run pathoscope](pathoscope.md)
 
 7) [Count your pathoscope reads](count_ps_reads.md)
+
+8) [Visualize in R](R_analysis.md)
+
+9) [Functional Analysis with HuMANN2](humann2.md)
+
