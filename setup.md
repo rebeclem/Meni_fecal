@@ -8,7 +8,7 @@ For every file inside a folder that has a L001 and an R1, make an object samp th
    for f in */*L001*R1*.gz;
    do samp=${f%%_*};
    echo ${samp};
-   mkdir -p "meni_"$samp;
+   mkdir -p $samp;
 done
 ```
 ### Moving all sequence files into sample directory.
@@ -16,7 +16,7 @@ Move all the files into the folders that match their directory.
 ```
 for f in */*.gz;
    do samp=${f%%_*};
-   mv $f "meni_"$samp;
+   mv $f $samp;
 done
 ```
 
