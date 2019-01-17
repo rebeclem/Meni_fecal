@@ -8,7 +8,7 @@ Call FastQC on the raw sequence files.
 ```
 module use /groups/cbi/shared/modulefiles
 module load fastqc
-for f in Konzo*; do
+for f in *; do
     fastqc -o $f -f $f/fastq ${f}_R1.fastq.gz $f/${f}_R2.fastq.gz
 done
 ```
@@ -45,7 +45,7 @@ See this [PDF](https://github.com/kmgibson/EV_konzo/blob/master/FastQC_Manual.pd
 
 Finally, we need to remove unncessary files:
 ```
-rm Konzo*/Konzo*_R?_fastqc.zip
+rm */*_R?_fastqc.zip
 ```
 
 <br />
