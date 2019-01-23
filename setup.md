@@ -77,5 +77,11 @@ do
     ln -s $f
 done
 ```
+### PhiX references -include this if you have PhiX in your samples (added during sequencing)
+```
+for f in /lustre/groups/cbi/shared/Databases/HMP/latest/phi*.bt2; do
+    ln -s $f
+done
+```
 ***
 Next Step: [Perform FastQC](fastqc.md)
