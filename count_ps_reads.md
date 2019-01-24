@@ -5,9 +5,9 @@ All of these commands need to be called while on an interactive node (not in hom
 salloc -p short -t 200 -N 1
 squeue # you will see a node### in the output
 ssh node### 
-
-cd to /Analysis/ folder
 ```
+cd to /Analysis/ folder
+
 
 
 Load `samtools`.
