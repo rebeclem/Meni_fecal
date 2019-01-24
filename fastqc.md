@@ -9,7 +9,7 @@ Call FastQC on the raw sequence files.
 module use /groups/cbi/shared/modulefiles
 module load fastqc
 for f in *; do
-    fastqc -o $f -f $f/fastq ${f}_R1.fastq.gz $f/${f}_R2.fastq.gz
+    fastqc -o $f -f fastq ${f}_R1.fastq.gz $f/${f}_R2.fastq.gz
 done
 ```
 If you do not have access to the module files in CBI, instead, run the following:
