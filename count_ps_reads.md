@@ -19,7 +19,7 @@ module load samtools
 #### Counting the number of __HUMAN__ mapped reads.
 
 1st, convert the `sam` file to a `bam` file.
-For these commands, you may have to `ctrl c` to make it quit because it has `&`s at the end
+The & at the end means that you can type in the next command before it finishes.
 
 ```
 for d in *; do 
