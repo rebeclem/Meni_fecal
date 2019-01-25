@@ -87,7 +87,7 @@ done
 ```
 Now download that folder to your computer with this command. This command needs to be excuted on your local computer (not within colonial one). I recommend opening up another tab on your terminal and then executing this command:
 ```
-scp your_username@login.colonialone.gwu.edu:path/to/Analysis/fastqc_cleaned /local/dir
+scp -r your_username@login.colonialone.gwu.edu:path/to/Analysis/fastqc_cleaned /local/dir
 ```
 >You will need to replace a few things, same thing as above. As an example for you, I have used my path and username.
 >
