@@ -52,7 +52,7 @@ flexbar --threads 10 \
 
 <br />
 
- After finishing flexbar, you will now have 3 files:
+ After finishing flexbar, you will now have 3 additional files in each of your directories inside Analysis:
  1. flexcleaned_1.fastq
  2. flexcleaned_2.fastq
  3. flexcleaned.log
@@ -61,9 +61,11 @@ flexbar --threads 10 \
 
  Understand your starting quality to see if the amount of reads you removed is reasonable.
  
+ Look inside each of your .err and .out files (using `cat *`) to make sure you didn't have any errors. Then remove these files using `rm flex*`.
+ 
  Next step: run [fastQC](fastqc.md) using [this script](fastqcflexbar.sh) on your cleaned samples inside the `Analysis` folder
 
-
+`sbatch ../scripts/fastqcflexbar.sh`
 
 You will get two output files for each fastq files (total of 4 files):
 1.  `flexcleaned_1_fastqc.html`
