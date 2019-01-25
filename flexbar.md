@@ -110,6 +110,5 @@ Finally, we need to remove unncessary files:
 ```
 rm */flexcleaned*fastqc.zip
 ```
-
-<br />
+***
 Next Step: [Count number of raw and cleaned reads](countreads.md)
