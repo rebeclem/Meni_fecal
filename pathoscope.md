@@ -6,7 +6,7 @@ You must be in the Analysis folder before calling any of the Pathoscope scripts.
 ```
 cd Analysis
 ```
-These pathoscope files have been changed from Keylie's in the following ways: Removed the PhiX174, and got rid of the 1-91 array line.
+Replace the 1-91 in the array line with 1-25 for these samples.
 ### **_Mapping to Human_**
 You will need the [`pathoscope_human.sh`](pathoscope_human.sh) file.
 ```
