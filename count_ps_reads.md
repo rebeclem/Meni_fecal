@@ -52,6 +52,10 @@ done
 
 
 #### Counting the number of __BACTERIA__ mapped reads.
+Try this from Nate instead:
+```
+cat ../samps.txt | while read d; do samtools view -b $d/bac/outalign.sam > $d/bac/outalign.bam ; echo "Converted $d/outalign.sam"; done
+```
 
 1st, convert the `sam` file to a `bam` file.
 ```
