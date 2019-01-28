@@ -52,7 +52,7 @@ done
 
 
 #### Counting the number of __BACTERIA__ mapped reads.
-Try this from Nate instead:
+If you have other files in with your sample directory, try this from Nate instead:
 ```
 cat ../samps.txt | while read d; do samtools view -b $d/bac/outalign.sam > $d/bac/outalign.bam ; echo "Converted $d/outalign.sam"; done
 ```
