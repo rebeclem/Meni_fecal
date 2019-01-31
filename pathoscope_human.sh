@@ -4,6 +4,8 @@
 #SBATCH -p defq,gpu,short
 #SBATCH -o PS_hg38.%A_%a.out
 #SBATCH -e PS_hg38.%A_%a.err
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=rebeccaclement@gwu.edu
 
 name=$(sed -n "$SLURM_ARRAY_TASK_ID"p ../samps.txt)
 
@@ -21,7 +23,7 @@ pathoscope.py MAP -numThreads $(nproc)\
  -outDir $name/human \
  -indexDir ../refs \
  -targetIndexPrefixes genome \
- -filterIndexPrefixes ref_prok_rep_genomes.00_ti,ref_prok_rep_genomes.01_ti,ref_prok_rep_genomes.02_ti,ref_prok_rep_genomes.03_ti,ref_prok_rep_genomes.04_ti,ref_prok_rep_genomes.05_ti,ref_viruses_rep_genomes_ti,ref_viroids_rep_genomes_ti \
+ -filterIndexPrefixes phix174, ref_prok_rep_genomes.00_ti,ref_prok_rep_genomes.01_ti,ref_prok_rep_genomes.02_ti,ref_prok_rep_genomes.03_ti,ref_prok_rep_genomes.04_ti,ref_prok_rep_genomes.05_ti,ref_viruses_rep_genomes_ti,ref_viroids_rep_genomes_ti \
  -1 $(ls $name/flexcleaned_1.fastq) \
  -2 $(ls $name/flexcleaned_2.fastq)
 
