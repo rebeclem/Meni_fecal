@@ -40,3 +40,10 @@ pathoscope.py ID \
 
 
 # this removes all unnecessary files that are taking up a lot of room.
+rm $name/human/pathomap-*
+
+#---Complete job
+t2=$(date +"%s")
+diff=$(($t2-$t1))
+echo "[---$SN---] ($(date)) $(($diff / 60)) minutes and $(($diff % 60)) seconds elapsed."
+echo "[---$SN---] ($(date)) $SN COMPLETE."
