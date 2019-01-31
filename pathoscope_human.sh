@@ -4,7 +4,7 @@
 #SBATCH -p defq,gpu,short
 #SBATCH -o PS_hg38.%A_%a.out
 #SBATCH -e PS_hg38.%A_%a.err
-SBATCH --array=1-25
+#SBATCH --array=1-25
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=rebeccaclement@gwu.edu
 
