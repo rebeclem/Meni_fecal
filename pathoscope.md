@@ -54,3 +54,5 @@ rsync -avh rebeccaclement@login.colonialone.gwu.edu:lustre/Meni/human .
 ```
 >
 
+Next step: [Count your pathoscope reads](count_ps_reads.md) 
+
