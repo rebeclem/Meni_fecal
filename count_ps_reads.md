@@ -105,3 +105,6 @@ Take both of these files and combine them in excel and add the grouping so the f
 | Konzo01 |	1302387	| 1031	| 8695258	| Kinshasa Control |
 
 I guess you have to subtract from the number of cleaned reads?
+
+Next step: [Visualize in R](R_analysis.md)
+
