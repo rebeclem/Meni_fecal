@@ -4,11 +4,11 @@
 ## **Files you will need:**
 - `samps.txt`
     - List of all the sample names
-- `EVKonzo_readcount.csv`
+- `read_count_meni.csv`
     - Created in Part 5 by counting sequencing reads.
-- `PS_read_counts.csv`
+- `reads_bac_human.csv`
     - Created in Part 7 by counting number of mapped reads.
-- `EVKonzo_metadata.csv`
+- `meni_metadata.csv`
     - List of all the sample names with their corresponding group.
     - This file should be in this format:
 
