@@ -32,3 +32,4 @@ Format needs to be as such:<br />
 | 3V1	| 7062682	| cleaned	| Kahemba Cases |
 
 Next you get to [run pathoscope!](pathoscope.md)
+* "&&" is used to chain commands together, such that the next command is run if and only if the preceding command exited without errors (or, more accurately, exits with a return code of 0)
