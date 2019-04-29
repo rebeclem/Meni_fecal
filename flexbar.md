@@ -13,6 +13,8 @@ You will need to put the adapter sequences that you used when library prepping y
 
 Make sure your `samp.txt` is in the folder that contains Analysis, refs, and scripts before submitting [flexbar.sh](flexbar.sh). 
 
+This script uses an array, which allows you to run the job on multiple samples at once if there are nodes available, instead of waiting for one to finish before the next one starts. You will notice a line at the beginning of `flexbar.sh` that says `#SBATCH --array=1-25`. This means that there are 25 files on our `samps.txt` file that we want to run it on. Change the number of files to however many you will be running it on.
+
 Submit a job to Slurm to call Flexbar on the raw sequence files.
 ```
 sbatch flexbar.sh
