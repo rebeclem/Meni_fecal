@@ -2,7 +2,7 @@
 #SBATCH -N 1
 #SBATCH -t 06:00:00
 #SBATCH -p defq,short,gpu
-#SBATCH --array=1-91
+#SBATCH --array=1-25
 #SBATCH -o flex.%A_%a.out
 #SBATCH -e flex.%A_%a.err
 #SBATCH --mail-type=ALL
