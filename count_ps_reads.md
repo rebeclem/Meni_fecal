@@ -104,7 +104,7 @@ Take both of these files and combine them in excel and add the grouping so the f
 | ---- | --- | --- | --- | --- |
 | Konzo01 |	1302387	| 1031	| 8695258	| Kinshasa Control |
 
-To get the unmapped reads column, use the number of cleaned reads divided by 2 (cleaned vs raw reads is talking about total, not paired reads)
+To get the unmapped reads column, use the number of cleaned reads (from read_counts.csv) divided by 2 (cleaned vs raw reads is talking about total, not paired reads), and subtract the number that mapped to bacteria and human.
 
 Next step: [Visualize in R](R_analysis.md)
 
