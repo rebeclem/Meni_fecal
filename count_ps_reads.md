@@ -18,7 +18,8 @@ module load samtools
 
 #### Counting the number of __HUMAN__ mapped reads.
 
-1st, convert the `sam` file to a `bam` file.
+1st, convert the `sam` file to a `bam` file. This will make it binary, so it takes up less space and is quicker to count. If you have large files, it may be good to run this using a script like samtobam.sh(samtobam.sh).
+
 The & at the end means that you can type in the next command before it finishes.
 
 ```
@@ -27,7 +28,7 @@ for d in *; do
 done & 
 ```
 
-2nd, pull all the mapped read names from the `bam` file.
+2nd, pull all the mapped read names from the `bam` file. The -F command, only displays the primary-mapped reads.
 ```
 for d in *; do 
     samtools view -F 4 $d/human/outalign.bam | cut -f1 > $d/human/tmp.txt && echo $d &
@@ -82,6 +83,7 @@ for d in *; do
 done 
 ```
 
+After you have converted the `.sam` files to `.bam` files, you can delete the `.sam` files to save space. However, be careful if you have done it on an interactive node, because it may not have completed.
 <br />
 
 ---
