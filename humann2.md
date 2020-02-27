@@ -16,9 +16,7 @@ Here we will call a set of scripts to complete HUMAnN2 functional analysis.
 1. [`humann2.sh`](https://github.com/kmgibson/EV_konzo/blob/master/scripts/humann2.sh)
 2. [`h2_renorm.sh`](https://github.com/kmgibson/EV_konzo/blob/master/scripts/h2_renorm.sh)
 3. [`h2_join_tab.sh`](https://github.com/kmgibson/EV_konzo/blob/master/scripts/h2_join_tab.sh)
-4. [`h2_associate.sh`](https://github.com/kmgibson/EV_konzo/blob/master/scripts/h2_associate.sh)
 5. [`h2_regroup_go.sh`](https://github.com/kmgibson/EV_konzo/blob/master/scripts/h2_regroup_go.sh)
-6. [`h2_go_associate.sh`](https://github.com/kmgibson/EV_konzo/blob/master/scripts/h2_go_associate.sh)
 
 
 You must be in the Analysis folder before calling any of the HUMAnN2 scripts.
@@ -81,38 +79,8 @@ The resulting files from this step are:
 ---
 ### Step 4. Editing the 3 joined output files
 
-We will need to edit the files `humann2_genefamilies.tsv`, `humann2_pathabundance.tsv`, and `humann2_pathcoverage.tsv` to include a "STATUS" line and an "ID" line.
+For Keylie's samples, she added a STATUS line but we had a lot of problems, and in the end couldn't get h2_associate to work. Instead, we downloaded the samples and ran them using Maaslin2 on R. We will need to edit the files `humann2_genefamilies.tsv`, `humann2_pathabundance.tsv`, and `humann2_pathcoverage.tsv` to include a "STATUS" line and an "ID" line.
 
-On the first line of each file change "# Gene Family" (or "# Pathway") to "ID". This is a simple text edit to the file. 
-
-The next step is to add this line: 
-```
-STATUS	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_casesKahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases
-```
-<br />
-
-Add this whole line right below the "ID" line. It is the "STATUS" line. Each group is separated by a tab. This line needs to be added below each of the ID lines in each of the three output files.
-
-Save each edited file as: `edited_humann2_genefamilies.tsv`, 
-`edited_humann2_pathabundance.tsv`, and 
-`edited_humann2_pathcoverage.tsv`, respectively.
-
-<br />
-
----
-### Step 5. h2_associate.sh
-
-This step is a statistical aid. It uses the lines "ID" and "STATUS" from the previous step (Step 4).
-
-```
-sbatch ../scripts/h2_associate.sh
-```
-
-There are three output files after this command as well: `stats_genefamilies_test.txt`, `stats_pathabun_test.txt`, and `stats_pathcoverage_test.txt`. When looking at the results, use the Q-value column because the Q-value takes into account the multiple testings for p-value.
-
-<br />
-
----
 ### Step 6. h2_regroup_go.sh
 
 This step regroups the pathways and genefamilies into GO terms.
@@ -122,42 +90,6 @@ sbatch ../scripts/h2_regroup_go.sh
 ```
 
 There are two output files from this command: `humann2_pathabundance_go.tsv` and `humann2_genefamilies_go.tsv`.
-
-<br />
-
----
-### Step 7. Editing the 3 joined output files
-
-Basically repeat Step 4:
-
-We will need to edit the files `humann2_pathabundance_go.tsv` and `humann2_genefamilies_go.tsv` to include a "STATUS" line and an "ID" line.
-
-On the first line of each file change "# Gene Family" (or "# Pathway") to "ID". This is a simple text edit to the file. 
-
-Again, add this line: 
-```
-STATUS	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kinshasa_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_control	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_casesKahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases	Kahemba_cases
-```
-<br />
-
-Add this whole line right below the "ID" line. It is the "STATUS" line. Each group is separated by a tab. This line needs to be added below each of the ID lines in each of the three output files.
-
-Save each edited file as: `humann2_pathabundance_go.tsv` and `humann2_genefamilies_go.tsv` , respectively.
-
-
-<br />
-
----
-### Step 8. h2_go_associate.sh
-
-This step is a statistical aid. It uses the lines "ID" and "STATUS" from the previous step (Step 7).
-
-```
-sbatch ../scripts/h2_go_associate.sh
-```
-
-There are two output file with Q-values from this step: `stats_genefamilies_go.txt` and `stats_pathabun_go.txt`.
-
 
 <br />
 
