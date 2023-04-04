@@ -69,7 +69,7 @@ cd refs
 
 #### Human reference
 ```
-for f in /lustre/groups/cbi/shared/References/Homo_sapiens/UCSC/hg38full/Sequence/Bowtie2Index/*.bt2;
+for f in /lustre/groups/cbi/Databases/Genomes/References/Homo_sapiens/UCSC/Sequence/Bowtie2Index/*.bt2;
  do
     ln -s $f
 done
